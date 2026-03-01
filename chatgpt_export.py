@@ -248,9 +248,17 @@ def capture_credentials():
             ],
             ignore_default_args=["--enable-automation"],
         )
-        page = context.pages[0] if context.pages else context.new_page()
-        page.on("request", on_request)
 
+        # Attach request listener to ALL pages (current and future)
+        # so we catch tokens even after OAuth redirects or new tabs
+        def attach_listener(page):
+            page.on("request", on_request)
+
+        for pg in context.pages:
+            attach_listener(pg)
+        context.on("page", attach_listener)
+
+        page = context.pages[0] if context.pages else context.new_page()
         page.goto("https://chatgpt.com/")
 
         # Wait for auth headers to appear (max 5 minutes)
@@ -258,7 +266,7 @@ def capture_credentials():
         while time.time() < deadline:
             if creds["token"]:
                 # Give a moment for account_id and device_id to also arrive
-                time.sleep(2)
+                time.sleep(3)
                 break
             time.sleep(1)
 
