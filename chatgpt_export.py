@@ -22,8 +22,12 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from urllib.parse import urlparse
+
+# Force unbuffered output so progress is visible immediately
+print = partial(print, flush=True)
 
 
 # ── Dependency Auto-Installer ────────────────────────────────────────────────
@@ -95,18 +99,20 @@ def ensure_dependencies():
             [sys.executable, "-m", "pip", "install", "--quiet"] + missing
         )
 
-    # Ensure Chromium is installed for Playwright
+    # Check if Chromium is installed by looking for INSTALLATION_COMPLETE marker
     try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            try:
-                browser = p.chromium.launch(headless=True)
-                browser.close()
-            except Exception:
-                print("Installing Chromium browser for Playwright...")
-                subprocess.check_call(
-                    [sys.executable, "-m", "playwright", "install", "chromium"]
-                )
+        result = subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "--dry-run", "chromium"],
+            capture_output=True, text=True, timeout=10,
+        )
+        # Parse the install location from dry-run output
+        for line in result.stdout.splitlines():
+            if "Install location:" in line:
+                install_dir = line.split("Install location:")[1].strip()
+                marker = Path(install_dir) / "INSTALLATION_COMPLETE"
+                if not marker.exists():
+                    raise Exception("not installed")
+                break
     except Exception:
         print("Installing Chromium browser for Playwright...")
         subprocess.check_call(
