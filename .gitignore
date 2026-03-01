@@ -1,5 +1,6 @@
 export/
 .venv/
+.browser-profile/
 __pycache__/
 *.pyc
 .DS_Store

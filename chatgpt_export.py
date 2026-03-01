@@ -234,17 +234,21 @@ def capture_credentials():
     print("Log in normally, then wait for the script to continue.")
     print("(You have 5 minutes to complete login)\n")
 
+    # Use a persistent profile so Google doesn't flag it as an automated browser
+    browser_profile = Path(__file__).parent / ".browser-profile"
+    browser_profile.mkdir(parents=True, exist_ok=True)
+
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        context = browser.new_context(
+        context = p.chromium.launch_persistent_context(
+            user_data_dir=str(browser_profile),
+            headless=False,
             viewport={"width": 1280, "height": 800},
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/145.0.0.0 Safari/537.36"
-            ),
+            args=[
+                "--disable-blink-features=AutomationControlled",
+            ],
+            ignore_default_args=["--enable-automation"],
         )
-        page = context.new_page()
+        page = context.pages[0] if context.pages else context.new_page()
         page.on("request", on_request)
 
         page.goto("https://chatgpt.com/")
@@ -258,7 +262,7 @@ def capture_credentials():
                 break
             time.sleep(1)
 
-        browser.close()
+        context.close()
 
     if not creds["token"]:
         print("ERROR: Could not capture authentication token.")
